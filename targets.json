@@ -1,0 +1,17 @@
+[
+  {
+    "name": "google",
+    "url": "http://www.google.com/",
+    "strategy": "desktop"
+  },
+  {
+    "name": "netflix",
+    "url": "http://www.netflix.com/",
+    "strategy": "desktop"
+  },
+  {
+    "name": "amazon-jp",
+    "url": "https://www.amazon.co.jp/",
+    "strategy": "mobile"
+  }
+]
