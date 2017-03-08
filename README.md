@@ -1,4 +1,4 @@
-psi-json
+pagespeed-logger
 ==========
 
 ```

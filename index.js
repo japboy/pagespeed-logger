@@ -1,6 +1,7 @@
 const fs = require('fs');
 const path = require('path');
 const globby = require('globby');
+const moment = require('moment');
 const superagent = require('superagent');
 
 require('dotenv').config();
@@ -20,13 +21,13 @@ if (urlPattern.test(targetPath)) {
   process.exit(1);
 }
 
-if (!savePath || !fs.statSync(savePath).isDirectory()) {
+if (!targetUrl && (!savePath || !fs.statSync(savePath).isDirectory())) {
   console.log('Invalid save path. Aborted.');
   process.exit(1);
 }
 
 
-function request (data) {
+function pagespeedinsights (data) {
   return superagent
   .get(process.env.PAGESPEED_API_ENDPOINT)
   .query({
@@ -36,6 +37,21 @@ function request (data) {
     screenshot: true,
     strategy: data.strategy,
     key: process.env.PAGESPEED_API_KEY,
+  });
+}
+
+function webpagetest (data) {
+  return superagent
+  .get(process.env.WEBPAGETEST_API_ENDPOINT)
+  .query({
+    url: data.url,
+    label: `${data.name} ${Date.now()}`,
+    location: 'Dulles:Chrome.DSL',
+    runs: 3,
+    f: 'json',
+    video: 1,
+    k: process.env.WEBPAGETEST_API_KEY,
+    mobile: data.strategy === 'mobile' ? 1 : 0,
   });
 }
 
@@ -50,8 +66,25 @@ function save (data) {
 }
 
 function requestAndSave (data) {
-  return request(data)
-  .then((response) => save({ filename: `${Date.now()}-${data.name}.json`, text: response.text }));
+  return Promise.all([
+    pagespeedinsights(data),
+    webpagetest(data),
+  ])
+  .then(function ([psiResponse, wptResponse]) {
+    const timestamp = Date.now();
+    const prefix = moment(timestamp).format('YYYYMMDDHHmm');
+    const datetime = moment(timestamp).format();
+    const psiBody = psiResponse.body;
+    const wptBody = wptResponse.body;
+    psiBody.name = data.name;
+    psiBody.datetime = datetime;
+    wptBody.name = data.name;
+    wptBody.datetime = datetime;
+    return Promise.all([
+      save({ filename: `${prefix}-${data.name}-pagespeedinsights.json`, text: JSON.stringify(psiBody) }),
+      save({ filename: `${prefix}-${data.name}-webpagetest.json`, text: JSON.stringify(wptBody) }),
+    ]);
+  });
 }
 
 function createList () {
@@ -61,12 +94,20 @@ function createList () {
 
 
 if (targetUrl) {
-  request({
-    url: targetUrl,
-    strategy: process.env.PAGESPEED_DEFAULT_STRATEGY,
-  })
-  .then(function (response) {
-    console.log(response.text);
+  Promise.all([
+    pagespeedinsights({
+      url: targetUrl,
+      strategy: process.env.PAGESPEED_DEFAULT_STRATEGY,
+    }),
+    webpagetest({
+      name: 'testing',
+      url: targetUrl,
+      strategy: process.env.PAGESPEED_DEFAULT_STRATEGY,
+    }),
+  ])
+  .then(function ([psiResponse, wptResponse ]) {
+    console.log(psiResponse.text);
+    console.log(wptResponse.text);
     process.exit(0);
   }, function (error) {
     console.log(error.message);
