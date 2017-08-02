@@ -1,0 +1,15 @@
+# Testing
+.logs
+
+# Node
+node_modules
+yarn.lock
+
+# Backpack
+build
+
+# Realm
+*.realm.management
+*.realm
+*.realm.lock
+realm-object-server
